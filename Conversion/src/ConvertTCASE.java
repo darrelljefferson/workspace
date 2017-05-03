@@ -8,17 +8,18 @@ import oracle.jdbc.OraclePreparedStatement;
 
 class ConvertTCASE { 
 	
-	static int BATCH_SIZE = 10000;
+	static int BATCH_SIZE = 10;
 	static long  Counter = 0;
 	static long  InsCounter = 0;
 	static long  ps_tsubcase_counter = 0;
 	static long TPERSON_counter = 0;
 	static long TCHARGE_counter = 0;
 	static long TADDRESS_counter = 0;
+	static long TPERSONIDENTIFIER_counter = 0;
+	static long TPARTY_counter = 0;
 	static DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
     static Connection src;
     static Connection trg;
-    // static Connection trg2;
     static Statement stmt;
     static Statement stmt2;
     static Statement stmt3;
@@ -29,14 +30,24 @@ class ConvertTCASE {
     static PreparedStatement ps_tperson;
     static PreparedStatement ps_taddress;
     static PreparedStatement ps_tparty;
+    static PreparedStatement ps_tpersonidentifier;
     static ResultSet rs3;
     static ResultSet rs4;
     static ResultSet rs5;
     static ResultSet rs6;
     static ResultSet hibernateRS;
-    static long HISTORY_NBR = 0;
+    static int HISTORY_NBR = 0;
     static int PERSON_ID = 0;
     static int SUBCASE_ID = 0;
+    static int HIBERNATE_SEQUENCE;
+    static int TCASE_ID;
+    static int TPERSONIDENTIFIER_ID;
+    static int TSUBCASE_ID;
+    static int TCHARGE_ID;
+    static int TASSOCIATEDPARTY_ID;
+    static int TPARTY_ID;
+    static int TADDRESS_ID;
+    static int TPERSON_ID;
     
    
 /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	 
@@ -60,11 +71,8 @@ Class.forName("oracle.jdbc.driver.OracleDriver");
  trg=DriverManager.getConnection(  
 "jdbc:oracle:thin:@bison:1521:TRNLV","vegas_training2","vt123456");  
  trg.setAutoCommit(false);
- 
-// trg2=DriverManager.getConnection(  
-// "jdbc:oracle:thin:@bison:1521:TRNLV","vegas_training2","vt123456"); 
 
-  
+ 
 //step3 create the statement object  
  stmt=src.createStatement();  
  stmt2=src.createStatement(); 
@@ -94,7 +102,7 @@ PreparedStatement ps = trg.prepareStatement("insert into TCASE " +
 " values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"); 
 ((OraclePreparedStatement)  ps).setExecuteBatch (BATCH_SIZE);
 
-PreparedStatement ps_tpersonidentifier = trg.prepareStatement("insert into TPERSONIDENTIFIER " +
+ ps_tpersonidentifier = trg.prepareStatement("insert into TPERSONIDENTIFIER " +
 		  "(ID , "                    +
 		  " CREATEUSERREALNAME, "     +     
 		  " CREATEUSERNAME,     "     +     
@@ -104,7 +112,7 @@ PreparedStatement ps_tpersonidentifier = trg.prepareStatement("insert into TPERS
 		  "LASTUPDATED, "             +                       // TIMESTAMP(6),
 		  "MEMO,   "                  +                 
 		  "PERSONIDENTIFIERNUMBER) "  +                           // NOT NULL,
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?,? )"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?,? )"); 
 ((OraclePreparedStatement)  ps_tpersonidentifier).setExecuteBatch (BATCH_SIZE);
 
 
@@ -127,7 +135,7 @@ ps_tsubcase = trg.prepareStatement("insert into TSUBCASE " +
 		  "STATUSDATE , "      +                  // TIMESTAMP(6),
 		  "VIOLATIONDATE, "    +                  // TIMESTAMP(6),
 		  "CASE_ID )"  +                          // NUMBER(19)       NOT NULL,
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?)"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?)"); 
 ((OraclePreparedStatement) ps_tsubcase).setExecuteBatch (BATCH_SIZE);
 
 
@@ -146,7 +154,7 @@ ps_tcharge = trg.prepareStatement("insert into TCHARGE " +
 		  "STATUSDATE , "           +                  
 		  "ASSOCIATEDPARTY_ID, "    +            
 		  "STATUTE_ID )"            +                          
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"); 
 ((OraclePreparedStatement) ps_tcharge).setExecuteBatch (BATCH_SIZE);
 
 
@@ -167,7 +175,7 @@ ps_tperson = trg.prepareStatement("insert into TPERSON " +
 		  "HISTORYNUMBER , "         + 
 		  "PERSONID , "              +   
 		  "PERSONIDENTIFIER_ID) "    +            
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ? )"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? ,?, ? )"); 
 ((OraclePreparedStatement) ps_tperson).setExecuteBatch (BATCH_SIZE);
 
 
@@ -190,7 +198,7 @@ ps_taddress = trg.prepareStatement("insert into TADDRESS " +
 		  "ZIP,"                      +
 		  "ASSOCIATEDPERSON_ID,"      +
  		  "ADDRESSIDENTIFIER_ID) "    +            
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"); 
 ((OraclePreparedStatement) ps_taddress).setExecuteBatch (BATCH_SIZE);
 
 ps_tparty = trg.prepareStatement("insert into TPARTY " +
@@ -207,20 +215,32 @@ ps_tparty = trg.prepareStatement("insert into TPARTY " +
 		  "CASE_ID,   "               +    // not null                   
 		  "PERSON_ID , "              +    // not null
 		  "SUBCASE_ID  ) "            +   
-		" values (HIBERNATE_SEQUENCE.NEXTVAL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"); 
+		" values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? )"); 
 ((OraclePreparedStatement) ps_tparty).setExecuteBatch (BATCH_SIZE);
 
 /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
 //step4 execute query  MAIN LOOP FOR CASE BUILDING
 /* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
-ResultSet rs=stmt.executeQuery("select  history_nbr from court.cms_case where rownum < 101 group by history_nbr");
+//ResultSet rs=stmt.executeQuery("select  history_nbr from court.cms_case where  rownum < 21 group by history_nbr having history_nbr > 0");
+
+ResultSet rs=stmt.executeQuery("select  incident_nbr, aoc_group, created_dttm, filing_dttm, nbr_of_charges, history_nbr, case_type, case_id from COURT.INCIDENT where  rownum < 21 ");
 
 ResultSet rs1=Trgstmt.executeQuery("select HIBERNATE_SEQUENCE.NEXTVAL from DUAL");
 
+int return_val = 0;
 
 while (rs1.next()) {
 	
-	ID = rs1.getInt(1);
+	HIBERNATE_SEQUENCE   = rs1.getInt(1);
+	TCASE_ID             = HIBERNATE_SEQUENCE;
+	TPERSONIDENTIFIER_ID = HIBERNATE_SEQUENCE;
+    TSUBCASE_ID          = HIBERNATE_SEQUENCE;
+    TCHARGE_ID           = HIBERNATE_SEQUENCE;
+    TASSOCIATEDPARTY_ID  = HIBERNATE_SEQUENCE;
+    TPARTY_ID            = HIBERNATE_SEQUENCE;
+    TADDRESS_ID          = HIBERNATE_SEQUENCE;
+    TPERSON_ID           = HIBERNATE_SEQUENCE;
+
 }
 rs1.close();
 
@@ -232,7 +252,9 @@ while(rs.next())  {
 	/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */		
 	InsCounter++;
 	
-	ps.setInt(1, ID);
+	TCASE_ID++;
+	System.out.println("****** START *********  Incident_nbr " + rs.getInt("incident_nbr") + " TCASE_ID " + TCASE_ID + "  ******************");
+	ps.setInt(1, TCASE_ID);
 	ps.setString(2, "ODI"); 
 	ps.setString(3, "ODI"); 
 	ps.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
@@ -241,48 +263,26 @@ while(rs.next())  {
 	ps.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
 	ps.setString(8, " " );                                                        // memo
 	ps.setInt(9, 0 );
-	ps.setInt(10,rs.getInt("history_nbr"));                                       // sourcecasenumber
-	HISTORY_NBR = rs.getInt("history_nbr");
-	ps.setString(11,  " ");                                                       // casename
-	ps.setString(12,  rs.getString(1));                                           // casenumber
-	ps.setString(13,  "TR");                                                      // Case type
-	ps.setDate(14,  new java.sql.Date(System.currentTimeMillis()));               // Filing Date
-	ps.setString(15, " ");
-	ps.setDate(16, new java.sql.Date(System.currentTimeMillis()));
-	ps.executeUpdate();                                                           //JDBC queues this for later execution               *** INSERT TCASE *****
+	ps.setInt(10,       rs.getInt("history_nbr"));                                // sourcecasenumber
+	ps.setString(11,    rs.getString("aoc_group"));                               // casename
+	ps.setInt(12,       rs.getInt("CASE_ID"));                                    // casenumber    LOOK AT!!!!
+	ps.setString(13,    rs.getString("case_type"));                               // Case type     LOOK AT !!!
+	ps.setDate(14,     new java.sql.Date(System.currentTimeMillis()));            // Filing Date
+	ps.setString(15, "CLOSE");                                                    // LOOK AT !!!!
+	ps.setDate(16, new java.sql.Date(System.currentTimeMillis()));             
+	return_val=ps.executeUpdate();                                                           //JDBC queues this for later execution               *** INSERT TCASE *****
+	System.out.println("TCASE - update result -> " + return_val);
+	HISTORY_NBR =       rs.getInt("history_nbr");
 	
-	
-	
-	//update_xref("TCASE", ID);
-	
-	/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
-	/* BUILD TPERSONIDENTIFIER */
-	/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
+	Build_TPERSON(HISTORY_NBR, ID);
+	Build_SubCase(HISTORY_NBR, ID );
 
-	ps_tpersonidentifier.setString(1, "ODI"); 
-	ps_tpersonidentifier.setString(2, "ODI"); 
-	ps_tpersonidentifier.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-	ps_tpersonidentifier.setString(4, "ODI"); 
-	ps_tpersonidentifier.setString(5, "ODI");
-	ps_tpersonidentifier.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-	ps_tpersonidentifier.setString(7, " " );       // memo
-	ps_tpersonidentifier.setInt(8,ID);             // PersonIdentifierNumber
-	ps_tpersonidentifier.executeUpdate();
-	
-	
-	/*  Insert LGOIC here for children Tables */
-	
-	Build_TPERSON(rs.getInt("history_nbr"), ID);
-	Build_SubCase(rs.getInt("history_nbr"), ID );
-
-    ID++;
-   
 	Counter++;
-	if (Counter > BATCH_SIZE) {
+	//if (Counter > BATCH_SIZE) {
 		 ((OraclePreparedStatement)ps).sendBatch();                   // JDBC sends the queued request
-		 ((OraclePreparedStatement)ps_tpersonidentifier).sendBatch(); // JDBC sends the queued request
+
 		 Counter = 0;
-	}
+	//}
 	
 	
 }
@@ -295,10 +295,10 @@ src.close();
   System.out.println("Total rows inserted into TPERSONIDENTIFIER " + InsCounter);
   System.out.println("Total rows inserted into TPERSON "     + TPERSON_counter);
   System.out.println("Total rows inserted into TCASE "       + InsCounter);
-  System.out.println("Total rows inserted into ps_tsubcase " + ps_tsubcase_counter);
+  System.out.println("Total rows inserted into TSUBCASE "    + ps_tsubcase_counter);
   System.out.println("Total rows inserted into TCHARGE "     + ps_tsubcase_counter);
   System.out.println("Total rows inserted into TADDRESS "    + TADDRESS_counter);
-  System.out.println("Total rows inserted into TPATY "       + ps_tsubcase_counter);
+  System.out.println("Total rows inserted into TPARTY "      + TPARTY_counter);
   
 	date = new Date();
 	System.out.println("End time is " + dateFormat.format(date)); 
@@ -330,76 +330,83 @@ static void Build_SubCase(int IN_HISTORY_NBR, int IN_ID)
 		
 			while (rs3.next()) {
 				ps_tsubcase_counter++;
-
-				ps_tsubcase.setString(1, "ODI"); 
-				ps_tsubcase.setString(2, "ODI"); 
-				ps_tsubcase.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tsubcase.setString(4, "ODI"); 
-				ps_tsubcase.setString(5, "ODI");
-				ps_tsubcase.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tsubcase.setString(7, " " );                                    // memo
-				ps_tsubcase.setInt(8, 0 );                                         // optlock
-				ps_tsubcase.setString(9,    rs3.getString("case_nbr"));            // sourcecasenumber
-				ps_tsubcase.setString(10,   rs3.getString("viol_original_desc"));  // case name
-				ps_tsubcase.setString(11,   rs3.getString("case_type"));
-				ps_tsubcase.setString(12,   rs3.getString("status"));              // status
-				ps_tsubcase.setString(13,   rs3.getString("status_dttm"));         // status Date
-     			ps_tsubcase.setString(14,   rs3.getString("viol_dttm"));           // violationdate
-				ps_tsubcase.setInt(15, ID);                                        // case_id
-				return_val = ps_tsubcase.executeUpdate();                          //JDBC queues this for later execution *** INSERT ps_tsubcase *****
-			    SUBCASE_ID = GetCurrent_Hibernate_Sequence();
 				
+				TSUBCASE_ID++ ;
+				ps_tsubcase.setInt(1, TSUBCASE_ID); 
+				ps_tsubcase.setString(2, "ODI");
+				ps_tsubcase.setString(3, "ODI"); 
+				ps_tsubcase.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tsubcase.setString(5, "ODI"); 
+				ps_tsubcase.setString(6, "ODI");
+				ps_tsubcase.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tsubcase.setString(8, " " );                                    // memo
+				ps_tsubcase.setInt(9, 0 );                                         // optlock
+				ps_tsubcase.setString(10,   rs3.getString("case_nbr"));            // sourcecasenumber
+				ps_tsubcase.setString(11,   rs3.getString("viol_original_desc"));  // case name
+				ps_tsubcase.setString(12,   rs3.getString("case_type"));
+				ps_tsubcase.setString(13,   rs3.getString("status"));              // status
+				ps_tsubcase.setString(14,   rs3.getString("status_dttm"));         // status Date
+     			ps_tsubcase.setString(15,   rs3.getString("viol_dttm"));           // violationdate
+				ps_tsubcase.setInt(16,TCASE_ID);                                   // case_id
+				return_val = ps_tsubcase.executeUpdate();                          //JDBC queues this for later execution *** INSERT ps_tsubcase *****
+				System.out.println("TSUBCASE - update result -> " + return_val);
+			    
+			    
 				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
 				/* BULD TCHARGE */
 				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
-
-				ps_tcharge.setString(1, "ODI"); 
+			    TCHARGE_counter++;
+			    
+			    TCHARGE_ID++;
+			    TASSOCIATEDPARTY_ID++;
+			    
+			    ps_tcharge.setInt(1, TCHARGE_ID);
 				ps_tcharge.setString(2, "ODI"); 
-				ps_tcharge.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tcharge.setString(4, "ODI"); 
-				ps_tcharge.setString(5, "ODI");
-				ps_tcharge.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tcharge.setString(7, " " );                                    // memo
-				ps_tcharge.setInt(8, 0 );                                         // optlock
-				ps_tcharge.setString(9,   rs3.getString("CASE_NBR"));            // sourcecasenumber
-				ps_tcharge.setString(10,  rs3.getString("STATUS"));               // status
-				ps_tcharge.setString(11,  rs3.getString("status_dttm"));          // status Date
-				ps_tcharge.setInt(12,  ID);                                       // ASSOCIATEDPARTY_ID,
-				ps_tcharge.setInt(13, GetStatute(rs3.getString("viol_original_code")));                          // STATUTE_ID
+				ps_tcharge.setString(3, "ODI"); 
+				ps_tcharge.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tcharge.setString(5, "ODI"); 
+				ps_tcharge.setString(6, "ODI");
+				ps_tcharge.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tcharge.setString(8, " " );                                     // memo
+				ps_tcharge.setInt(9, 0 );                                          // optlock
+				ps_tcharge.setString(10,   rs3.getString("CASE_NBR"));             // sourcecasenumber
+				ps_tcharge.setString(11,   rs3.getString("STATUS"));               // status
+				ps_tcharge.setString(12,   rs3.getString("status_dttm"));          // status Date
+				ps_tcharge.setInt(13,  TASSOCIATEDPARTY_ID );                   // ASSOCIATEDPARTY_ID
+				ps_tcharge.setInt(14, GetStatute(rs3.getString("viol_original_code")));                          // STATUTE_ID
 				return_val = ps_tcharge.executeUpdate();                                                         //JDBC queues this for later execution *** INSERT TCHARGE ***
-				TCHARGE_counter++;
-			
+				System.out.println("TCHARGE - update result -> " + return_val);
 				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
 				/* BULD TPARTY */
 				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
 
-				
-				
-				System.out.println("TCASE_ID -> " + IN_ID + " PERSON_ID -> " + PERSON_ID + " TSUBCASE_ID -> " + SUBCASE_ID);
-				
-				
-				ps_tparty.setString(1, "ODI"); 
+		        TPARTY_counter++;
+				TPARTY_ID++;
+				ps_tparty.setInt(1, TPARTY_ID);
 				ps_tparty.setString(2, "ODI"); 
-				ps_tparty.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tparty.setString(4, "ODI"); 
-				ps_tparty.setString(5, "ODI");
-				ps_tparty.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tparty.setString(7, " " );                                    // memo
-				ps_tparty.setInt(8, 0 );                                         // optlock
-				ps_tparty.setString(9,   rs3.getString("CASE_NBR"));             // sourcecasenumber
-				ps_tparty.setInt(10,  IN_ID);                                    // TCASE case_id
-				ps_tparty.setInt(11,  PERSON_ID);                                // PERSON_ID
-				ps_tparty.setInt(12,  SUBCASE_ID);                               // SUBCASE_ID,
+				ps_tparty.setString(3, "ODI"); 
+				ps_tparty.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tparty.setString(5, "ODI"); 
+				ps_tparty.setString(6, "ODI");
+				ps_tparty.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tparty.setString(8, " " );                                    // memo
+				ps_tparty.setInt(9, 0 );                                         // optlock
+				ps_tparty.setString(10,   rs3.getString("CASE_NBR"));             // sourcecasenumber
+				ps_tparty.setInt(11,  TCASE_ID);                                 // TCASE case_id
+				ps_tparty.setInt(12,  TPERSON_ID);                                // PERSON_ID
+				ps_tparty.setInt(13,  TSUBCASE_ID);                               // SUBCASE_ID,
 				return_val = ps_tparty.executeUpdate();                                                         //JDBC queues this for later execution *** INSERT TCHARGE ***
-				TCHARGE_counter++;
-		
+				
+				System.out.println("TPARTY - update result -> " + return_val);
+				System.out.println("TCASE_ID -> " + TCASE_ID + " TPERSON_ID -> " + TPERSON_ID + " TSUBCASE_ID -> " + TSUBCASE_ID + " TPARTY_ID -> " + TPARTY_ID);
+				
 				ws_counter++;
-				if (ws_counter > BATCH_SIZE) {
+				//if (ws_counter > BATCH_SIZE) {
 			  	 ((OraclePreparedStatement)ps_tsubcase).sendBatch();                                                // JDBC sends the queued request
 			  	 ((OraclePreparedStatement)ps_tcharge).sendBatch();                                                 // JDBC sends the queued request
 			  	 ((OraclePreparedStatement)ps_tparty).sendBatch();                                                  // JDBC sends the queued request
 					 ws_counter = 0;
-				}
+				//}
 				
 				
 				
@@ -462,87 +469,97 @@ static int Build_TPERSON (int IN_HISTORY_NBR, int IN_ID)
 	
 	int ws_counter = 0;
 
+
 	
 	try {
-	      rs4=stmt2.executeQuery("select   first_name,last_name, middle_name, numeric_case_nbr, defendant, dob, ssn,   dl_nbr  from court.cms_case where history_nbr =" + IN_HISTORY_NBR + " and rownum =1 ");
+	      rs4=stmt2.executeQuery("select   first_name,last_name, middle_name, numeric_case_nbr, defendant, dob, ssn, dl_nbr, address1, address2, city, state, zip  from court.cms_case where history_nbr =" + HISTORY_NBR );
 	
 	      while (rs4.next()) {
+	    	  
+	    	     int ws_up = 0;
+	    		 System.out.println("IN_HISTORY_NBR " + IN_HISTORY_NBR + " TPERSON_ID ==> " + TPERSON_ID );
 				TPERSON_counter++;
-				
- 
-				ps_tperson.setString(1, "ODI"); 
+				TPERSON_ID++;
+				ps_tperson.setInt(1, TPERSON_ID);
 				ps_tperson.setString(2, "ODI"); 
-				ps_tperson.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tperson.setString(4, "ODI"); 
-				ps_tperson.setString(5, "ODI");
-				ps_tperson.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-				ps_tperson.setString(7, " " );                                  // memo
-				ps_tperson.setInt(8, 0 );                                      // optlock
-				ps_tperson.setString(9,   rs4.getString("first_name"));        // FirstName
-				ps_tperson.setString(10,  rs4.getString("last_name"));         // Last name
-				ps_tperson.setString(11,  rs4.getString("middle_name"));       // Middle Name
-				ps_tperson.setInt(12,     rs4.getInt("numeric_case_nbr"));     // CMSCASENUMBER
-				ps_tperson.setInt(13,     IN_HISTORY_NBR);                     // History
-				ps_tperson.setInt(14,     IN_ID);                              // PersonID
-				ps_tperson.setInt(15,      rs4.getInt("numeric_case_nbr"));    // case_id
-				ps_tperson.executeUpdate();                                    //JDBC queues this for later execution 
-
-                PERSON_ID = GetCurrent_Hibernate_Sequence();
+				ps_tperson.setString(3, "ODI"); 
+				ps_tperson.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tperson.setString(5, "ODI"); 
+				ps_tperson.setString(6, "ODI");
+				ps_tperson.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tperson.setString(8, " " );                                  // memo
+				ps_tperson.setInt(9, 0 );                                       // optlock
+				ps_tperson.setString(10,   rs4.getString("first_name"));        // FirstName
+				ps_tperson.setString(11,   rs4.getString("last_name"));         // Last name
+				ps_tperson.setString(12,   rs4.getString("middle_name"));       // Middle Name
+				ps_tperson.setInt(13,      rs4.getInt("numeric_case_nbr"));     // CMSCASENUMBER
+				ps_tperson.setInt(14,      IN_HISTORY_NBR);                     // History
+				ps_tperson.setInt(15,      TPERSONIDENTIFIER_ID);               // PersonID
+				ps_tperson.setInt(16,      rs4.getInt("numeric_case_nbr"));     // case_id
+				ws_up=ps_tperson.executeUpdate();                                     // JDBC queues this for later execution 
+				System.out.println("TPERSON - update result -> " + ws_up);
 				
-				ws_counter++;
-				if (ws_counter > BATCH_SIZE) {
-			  	 ((OraclePreparedStatement)ps_tperson).sendBatch();               // JDBC sends the queued request
-					 ws_counter = 0;
-				}
+				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
+				/* BUILD TPERSONIDENTIFIER */
+				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
 				
+				
+				TPERSONIDENTIFIER_counter++;
+				TPERSONIDENTIFIER_ID++;
+				
+				ps_tpersonidentifier.setInt(1, TPERSONIDENTIFIER_ID);
+				ps_tpersonidentifier.setString(2, "ODI"); 
+				ps_tpersonidentifier.setString(3, "ODI"); 
+				ps_tpersonidentifier.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tpersonidentifier.setString(5, "ODI"); 
+				ps_tpersonidentifier.setString(6, "ODI");
+				ps_tpersonidentifier.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_tpersonidentifier.setString(8, " " );                       // memo
+				ps_tpersonidentifier.setInt(9,TPERSON_ID);                     // PersonIdentifierNumber   !!!! LOOK AT  !!!
+				ws_up = ps_tpersonidentifier.executeUpdate();
+				System.out.println("TPERSONIDENTIFIER - update result -> " + ws_up);
 
-	      }  // END-WHILE
-
-	      
-	      
-			/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
-			/* BULD TADDRESS */
-			/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */		
-	      
-
-	      ws_counter=0;
-	      rs6=stmt2.executeQuery("select  address1, address2, city, state, zip from court.cms_case where history_nbr =" + IN_HISTORY_NBR + " and rownum =1 ");
-	  	
-	      
-	      while (rs6.next()) {
+				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */	
+				/* BULD TADDRESS */
+				/* +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ */		               
 				TADDRESS_counter++;
-
-				ps_taddress.setString(1, "ODI"); 
+			
+				ps_taddress.setInt(1, TADDRESS_ID); 
 				ps_taddress.setString(2, "ODI"); 
-				ps_taddress.setDate(3, new java.sql.Date(System.currentTimeMillis())); 
-				ps_taddress.setString(4, "ODI"); 
-				ps_taddress.setString(5, "ODI");
-				ps_taddress.setDate(6, new java.sql.Date(System.currentTimeMillis())); 
-				ps_taddress.setString(7, " " );                                 // memo
-				ps_taddress.setInt(8, 0 );                                      // optlock
-				ps_taddress.setInt(9,   IN_HISTORY_NBR);                        // history_nbr
-				ps_taddress.setString(10,  rs6.getString("address1"));          // address1
-				ps_taddress.setString(11,  rs6.getString("address2"));          // address2
-				ps_taddress.setString(12,  "HOME");                             // address type
-				ps_taddress.setString(13,  rs6.getString("city"));              // city
-				ps_taddress.setString(14,  rs6.getString("state"));             // state
-				ps_taddress.setString(15,  rs6.getString("zip"));               // zip
-				ps_taddress.setInt(16,     IN_ID);                              // ASSOCATEDPERSON_ID
-				ps_taddress.setInt(17,     IN_ID);                              // ADDRESSIDENTIFIER_ID
-				ps_taddress.executeUpdate();                                    // JDBC queues this for later execution 
-
-
+				ps_taddress.setString(3, "ODI"); 
+				ps_taddress.setDate(4, new java.sql.Date(System.currentTimeMillis())); 
+				ps_taddress.setString(5, "ODI"); 
+				ps_taddress.setString(6, "ODI");
+				ps_taddress.setDate(7, new java.sql.Date(System.currentTimeMillis())); 
+				ps_taddress.setString(8, " " );                                 // memo
+				ps_taddress.setInt(9, 0 );                                      // optlock
+				ps_taddress.setInt(10,     HISTORY_NBR);                        // history_nbr
+				ps_taddress.setString(11,  rs6.getString("address1"));          // address1
+				ps_taddress.setString(12,  rs6.getString("address2"));          // address2
+				ps_taddress.setString(13,  "HOME");                             // address type
+				ps_taddress.setString(14,  rs6.getString("city"));              // city
+				ps_taddress.setString(15,  rs6.getString("state"));             // state
+				ps_taddress.setString(16,  rs6.getString("zip"));               // zip
+				ps_taddress.setInt(17,     TPERSONIDENTIFIER_ID);                // ASSOCATEDPERSON_ID
+				ps_taddress.setString(18,     " ");                              // ADDRESSIDENTIFIER_ID
+				ws_up=ps_taddress.executeUpdate();                                    // JDBC queues this for later execution 
+				System.out.println("TADDRESS - update result -> " + ws_up);
+				
+				TADDRESS_ID++;
+				
+				
 				ws_counter++;
-				if (ws_counter > BATCH_SIZE) {
-			  	 ((OraclePreparedStatement)ps_taddress).sendBatch(); // JDBC sends the queued request
+				// if (ws_counter > BATCH_SIZE) {
+			  	 ((OraclePreparedStatement)ps_tperson).sendBatch();               // JDBC sends the queued request
+			  	 ((OraclePreparedStatement)ps_tpersonidentifier).sendBatch();     // JDBC sends the queued request
+			  	 ((OraclePreparedStatement)ps_taddress).sendBatch();              // JDBC sends the queued request
 					 ws_counter = 0;
-				}
+				// }
 				
 
 	      }  // END-WHILE
-	      
-      
-	
+
+
 	
 	} catch (Exception e) { System.out.println( e.getMessage()) ; }
 	
