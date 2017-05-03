@@ -1,0 +1,17 @@
+
+public class LoadTCASE {
+	
+	
+	public static void main (String args [] ) {
+		
+		System.out.println("Made it here");
+	}
+	
+	
+	
+	public static String loadtable() {
+		
+		return "Loaded TCASE";
+	}
+
+}

@@ -1,0 +1,9 @@
+
+public class LoadTCASE {
+	
+	public static String loadtable() {
+		
+		return "Loaded TCASE";
+	}
+
+}
